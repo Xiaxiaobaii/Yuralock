@@ -27,6 +27,7 @@ Yuralock常态/加密时：～30mb / ~30mb
 ### 存储占用
 
 Encrypto：4.61mb
+
 Yuralock：linux为16.8mb, windows为20.2mb
 
 ## 特性详述
