@@ -1,7 +1,49 @@
-# Tauri + Vue + TypeScript
+# Yuralock (由良锁)
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+技术栈：Tauri + Rust + Vue
 
-## Recommended IDE Setup
+特点：支持部分加密，文件头伪装，加解密速度极快，自带文件名恢复，文件完整性校验，占用低
 
-- [VS Code](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+------
+
+没啥好说的，技术特征后面说，先赛博斗蛐蛐
+
+测试设备：i5-1155g7
+
+### 时长对比
+
+文件大小为1.23gb
+
+Encrypto加解密时长：2m52s57 / 21s97
+
+Yuralock加解密时长（加密比例100）：2s6 / 2s7
+
+### 内存占用
+
+Encrypto常态/加密时：~100mb / ~120mb
+
+Yuralock常态/加密时：～30mb / ~30mb
+
+### 存储占用
+
+Encrypto：4.61mb
+Yuralock：linux为16.8mb, windows为20.2mb
+
+## 特性详述
+
+支持零加密至全加密，可以自定义文件加密部分占比
+
+加密比例为0时不加密文件，但是设置伪装层，记录文件头信息（文件头会被加密），写入sha256校验码
+
+全加密时将全部文件加密，设置伪装层，记录文件头信息（被加密），写入sha256校验码
+
+部分加密时将文件前x%加密，设置伪装层，记录文件头信息（被加密），写入sha256校验码，x可自定义
+
+
+## TODO
+
+❌ 预计支持AES256, ChaCha20, ML-KEM
+
+❌ 支持查看加密进度，当前加解密时程序会被卡住
+
+❌ io_uring
