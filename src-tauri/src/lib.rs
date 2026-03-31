@@ -9,8 +9,7 @@ use serde::Serialize;
 use tauri::Emitter;
 use uuid::Uuid;
 use yuralock::{
-    crypto::{decrypt, encrypt, BlakeRead},
-    EncryFile, EncryHeader,
+    EncryFile, EncryHeader, crypto::{BlakeRead, decrypt, encrypt}, hashdrop
 };
 
 #[derive(Serialize)]
@@ -149,12 +148,10 @@ fn decrypt_part_file_from_path(
     io::copy(&mut no_encry_source, &mut dest).map_err(|_| "原始内容拷贝失败！")?;
     emit_log(&window, "原始内容拷贝完成");
 
-    let mut hash_buf = vec![0u8; 64];
+    let mut hash_buf = vec![0u8; 16];
     read_exact_from_normal(&mut source, &mut hash_buf)?;
-    let source_hash = source.update_finalize().to_string();
-    let origin_hash = String::from_utf8(hash_buf).map_err(|_| "文件校验失败，还原结果与原始文件不一致")?;
 
-    if source_hash != origin_hash {
+    if hashdrop(source.update_finalize(), &key) != *hash_buf {
         emit_log(&window, "文件校验失败");
         return Err("文件校验失败，还原结果与原始文件不一致".to_string());
     }
