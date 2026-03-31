@@ -12,7 +12,8 @@ lerna-debug.log*
 
 .codex
 
-src-tauri
+src-tauri/target
+
 node_modules
 dist
 dist-ssr
