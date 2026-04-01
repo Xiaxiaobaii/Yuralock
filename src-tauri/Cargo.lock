@@ -5874,7 +5874,7 @@ dependencies = [
 
 [[package]]
 name = "yuralock_tauri"
-version = "0.1.6"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "rfd 0.15.4",
