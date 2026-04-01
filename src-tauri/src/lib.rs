@@ -9,7 +9,6 @@ use anyhow::bail;
 use rfd::FileDialog;
 use tauri_plugin_android_fs::AndroidFsExt;
 use serde::Serialize;
-use tauri_plugin_dialog::DialogExt;
 use uuid::Uuid;
 use yuralock::{
     crypto::{decrypt, encrypt, BlakeRead},
@@ -154,7 +153,7 @@ fn pick_input_file() -> Option<String> {
 }
 
 #[tauri::command]
-async fn tauri_pick_input_file(app: tauri::AppHandle<impl tauri::Runtime>) -> Result<std::fs::File, anyhow::Error> {
+async fn _tauri_pick_input_file(app: tauri::AppHandle<impl tauri::Runtime>) -> Result<std::fs::File, anyhow::Error> {
     // Pick files to read and write
     let api = app.android_fs_async();
     
