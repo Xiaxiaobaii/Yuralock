@@ -1,29 +1,31 @@
 {
   "name": "yuralock_tauri",
   "private": true,
-  "version": "0.1.6",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "setup:arch": "./scripts/setup-arch-tauri.sh",
     "setup:win-cross": "./scripts/setup-win-cross.sh",
-    "tauri:build": "vue-tsc --noEmit && tauri build && tauri build --target x86_64-pc-windows-gnu --no-bundle && npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-gnu",
-    "tauri:build:win-exe": "tauri build --target x86_64-pc-windows-gnu --no-bundle",
-    "tauri:build:win-nsis": "tauri build --target x86_64-pc-windows-gnu --bundles nsis",
-    "tauri:build:win-msi": "tauri build --target x86_64-pc-windows-gnu --bundles msi"
+    "tauri:build": "tauri build && npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-gnu",
+    "tauri:build:android": "npm run tauri android build",
+    "tauri:build:win-nsis": "tauri build --target x86_64-pc-windows-gnu --bundles nsis"
   },
   "dependencies": {
-    "vue": "^3.5.13",
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2"
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-fs": "^2.4.5",
+    "@tauri-apps/plugin-opener": "^2",
+    "vue": "^3.5.13"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2",
     "@vitejs/plugin-vue": "^5.2.1",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
-    "vue-tsc": "^2.1.10",
-    "@tauri-apps/cli": "^2"
+    "vue-tsc": "^2.1.10"
   }
 }

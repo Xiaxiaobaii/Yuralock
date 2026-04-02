@@ -1,8 +1,8 @@
 [package]
 name = "yuralock_tauri"
-version = "0.1.8"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.2.0"
+description = "高性能反审查加密软件"
+authors = ["xiaxiaobaiqwq@gmail.com"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -25,8 +25,9 @@ serde_json = "1"
 yuralock = { version = "0.1.0", path = "../../yuralock" }
 uuid = { version = "1", features = ["v4"] }
 tauri-plugin-dialog = "2"
-tauri-plugin-fs = "2"
 tauri-plugin-android-fs = "28.0.2"
+tauri-plugin-fs = "2"
+tokio = { version = "1.50.0", features = ["full"] }
 anyhow = "1.0.102"
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
@@ -35,6 +36,6 @@ rfd = "0.15"
 [profile.release]
 codegen-units = 1 # Allows LLVM to perform better optimization.
 lto = true # Enables link-time-optimizations.
-opt-level = "s" # Prioritizes small binary size. Use `3` if you prefer speed.
+opt-level = 3
 panic = "abort" # Higher performance by disabling panic handlers.
 strip = true # Ensures debug symbols are removed.

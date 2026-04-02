@@ -1,0 +1,222 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #111;
+  background: #fff;
+}
+
+body {
+  margin: 0;
+}
+
+#app {
+  padding: 0;
+}
+
+.page {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  pointer-events: none;
+  transition: background-color 520ms ease;
+}
+
+.splash-icon {
+  width: clamp(300px, 52vmin, 560px);
+  height: clamp(300px, 52vmin, 560px);
+  object-fit: contain;
+  will-change: transform, opacity;
+  animation: splash-reveal 1.22s cubic-bezier(0.08, 0.95, 0.28, 1) forwards;
+  /* transition: transform 620ms ease-out, filter 620ms ease-out; */
+}
+
+@keyframes splash-reveal {
+  0% {
+    transform: rotate(0deg) scale(0.12);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  70% {
+    transform: rotate(360deg) scale(1.52);
+    opacity: 1;
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1.52);
+    opacity: 0.1;
+
+  }
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 16px;
+  background: transparent;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 306ms ease-out;
+}
+
+.app.is-ready {
+  opacity: 1;
+}
+
+.panel {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+}
+
+.title {
+  margin: 0;
+  text-align: center;
+}
+
+.title-image {
+  display: block;
+  width: min(320px, 72vw);
+  height: auto;
+  margin: 0 auto;
+}
+
+.form {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 10px;
+}
+
+.file-btn,
+.run-btn,
+input {
+
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #cfd3db;
+  border-radius: 10px;
+  font-size: 14px;
+  padding: 10px 12px;
+  transition: all 0.2s ease;
+}
+
+.file-btn {
+  background-color: #fffcfc;
+  color: #16181d;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.path-preview {
+  margin: -2px 0 2px;
+  font-size: 12px;
+  color: #6f7785;
+  word-break: break-all;
+}
+
+.key-row {
+  display: grid;
+  background-color: #fffcfc;
+  gap: 8px;
+}
+
+input {
+  background: #fff;
+  color: #16181d;
+}
+
+.run-btn {
+  border-color: #16181d;
+  background: #16181d;
+  color: #fff;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 300;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d6dbe6;
+  background: #f5fbf7;
+  color: #1a4428;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-all;
+  pointer-events: none;
+}
+
+.toast.error {
+  background: #fff3f3;
+  border-color: #f2c7c7;
+  color: #932727;
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  .app {
+    padding: 12px 10px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .file-btn,
+  .run-btn,
+  input {
+    
+    font-size: 16px;
+    padding: 11px 12px;
+  }
+
+  .splash-icon {
+    width: clamp(220px, 62vw, 420px);
+    height: clamp(220px, 62vw, 420px);
+  }
+
+  .toast {
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100vw - 20px);
+    font-size: 12px;
+  }
+}

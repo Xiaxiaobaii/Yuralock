@@ -1,14 +1,14 @@
 use std::{
     fs::{self, File},
     io::{self, Read},
-    path::{Path, PathBuf}, time::Instant,
+    path::{Path, PathBuf},
+    time::Instant,
 };
 
-use anyhow::bail;
 #[cfg(not(target_os = "android"))]
 use rfd::FileDialog;
-use tauri_plugin_android_fs::AndroidFsExt;
 use serde::Serialize;
+use tauri::Emitter;
 use uuid::Uuid;
 use yuralock::{
     crypto::{decrypt, encrypt, BlakeRead},
@@ -16,12 +16,47 @@ use yuralock::{
     EncryFile, EncryHeader,
 };
 
+#[cfg(target_os = "android")]
+mod android;
+
 const DEFAULT_ENCRYPT_PART: u64 = 20;
 
 #[derive(Serialize)]
 struct CryptoResult {
     output_path: String,
     message: String,
+}
+
+#[derive(Clone, Serialize)]
+struct ToastPayload {
+    message: String,
+    #[serde(rename = "type")]
+    toast_type: String,
+}
+
+fn emit_frontend_toast(
+    app: &tauri::AppHandle,
+    message: impl Into<String>,
+    toast_type: impl Into<String>,
+) -> Result<(), String> {
+    app.emit(
+        "frontend://show-toast",
+        ToastPayload {
+            message: message.into(),
+            toast_type: toast_type.into(),
+        },
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn show_toast_from_backend(
+    app: tauri::AppHandle,
+    message: String,
+    toast_type: Option<String>,
+) -> Result<(), String> {
+    let toast_type = toast_type.unwrap_or_else(|| "success".to_string());
+    emit_frontend_toast(&app, message, toast_type)
 }
 
 fn output_dir_from_input(input_path: &Path) -> Result<PathBuf, String> {
@@ -114,28 +149,32 @@ fn decrypt_file_from_path(source_path: PathBuf, key: String) -> Result<CryptoRes
 }
 
 #[tauri::command]
-async fn peek_file_from_path(input_path: String) -> Result<bool, String> {
-    let source_path = normalize_input_path(&input_path)?;
-    fs::metadata(&source_path).map_err(|e| e.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || Ok(peek_file(&source_path).unwrap_or(false)))
-        .await
-        .map_err(|e| e.to_string())?
+async fn peek_file_from_path(_app: tauri::AppHandle, input_path: String) -> Result<bool, String> {
+    #[cfg(target_os = "android")]
+    {
+        return Ok(android::peek_file_from_uri(&_app, &input_path).await);
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        Ok(peek_file(Path::new(&input_path)).unwrap_or(false))
+    }
 }
 
-#[tauri::command]
-async fn process_file_from_path(input_path: String, key: String) -> Result<CryptoResult, String> {
+async fn process_file_from_path_inner(
+    input_path: String,
+    isencry: bool,
+    key: String,
+) -> Result<CryptoResult, String> {
     let source_path = validate_common(&input_path, &key)?;
     fs::metadata(&source_path).map_err(|e| e.to_string())?;
     let start = Instant::now();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let is_encrypted = peek_file(&source_path).unwrap_or(false);
-        
-        if is_encrypted {
+        if isencry {
             decrypt_file_from_path(source_path, key)
         } else {
             encrypt_file_from_path(source_path, key)
         }
-
     })
     .await
     .map_err(|e| e.to_string())?;
@@ -145,44 +184,54 @@ async fn process_file_from_path(input_path: String, key: String) -> Result<Crypt
 }
 
 #[tauri::command]
-#[cfg(not(target_os = "android"))]
-fn pick_input_file() -> Option<String> {
-    FileDialog::new()
-        .pick_file()
-        .map(|path| path.to_string_lossy().to_string())
+async fn process_file_from_path(
+    _app: tauri::AppHandle,
+    input_path: String,
+    isencry: bool,
+    key: String,
+) -> Result<CryptoResult, String> {
+    #[cfg(target_os = "android")]
+    return android::process_file_from_android_uri(&_app, &input_path, isencry, key).await;
+
+    #[cfg(not(target_os = "android"))]
+    {
+        process_file_from_path_inner(input_path, isencry, key).await
+    }
 }
 
 #[tauri::command]
-async fn _tauri_pick_input_file(app: tauri::AppHandle<impl tauri::Runtime>) -> Result<std::fs::File, anyhow::Error> {
-    // Pick files to read and write
-    let api = app.android_fs_async();
-    
-    // Pick files to read and write
-    let selected_files = api
-        .file_picker()
-        .pick_files(
-            None, // Initial location
-            &["*/*"], // Target MIME types
-            false, // If true, only files on local device
-        )
-        .await?;
-
-    if selected_files.is_empty() {
-        bail!("")
+async fn pick_input_file(_app: tauri::AppHandle) -> String {
+    #[cfg(target_os = "android")]
+    {
+        match android::pick_input_file(&_app).await {
+            Ok(path) => return path,
+            Err(error) => {
+                let _ = emit_frontend_toast(&_app, error, "error");
+                return String::new();
+            }
+        }
     }
-    else {
-        Ok(api.open_file_readable(&selected_files.get(0).unwrap()).await?)
+
+    #[cfg(not(target_os = "android"))]
+    {
+        return FileDialog::new()
+            .pick_file()
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_default();
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
+pub async fn run() {
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_android_fs::init())
+        .plugin(tauri_plugin_android_fs::init());
+
+    builder
         .invoke_handler(tauri::generate_handler![
+            show_toast_from_backend,
             peek_file_from_path,
             process_file_from_path,
             pick_input_file,
