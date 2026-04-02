@@ -167,17 +167,12 @@ async fn process_file_from_path_inner(
     key: String,
 ) -> Result<CryptoResult, String> {
     let source_path = validate_common(&input_path, &key)?;
-    fs::metadata(&source_path).map_err(|e| e.to_string())?;
     let start = Instant::now();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        if isencry {
-            decrypt_file_from_path(source_path, key)
-        } else {
-            encrypt_file_from_path(source_path, key)
-        }
-    })
-    .await
-    .map_err(|e| e.to_string())?;
+    let result = if isencry {
+        decrypt_file_from_path(source_path, key)
+    } else {
+        encrypt_file_from_path(source_path, key)
+    };
     let duration = start.elapsed();
     println!("Processing time: {:?}", duration);
     result
@@ -194,9 +189,7 @@ async fn process_file_from_path(
     return android::process_file_from_android_uri(&_app, &input_path, isencry, key).await;
 
     #[cfg(not(target_os = "android"))]
-    {
-        process_file_from_path_inner(input_path, isencry, key).await
-    }
+    process_file_from_path_inner(input_path, isencry, key).await
 }
 
 #[tauri::command]
@@ -213,12 +206,10 @@ async fn pick_input_file(_app: tauri::AppHandle) -> String {
     }
 
     #[cfg(not(target_os = "android"))]
-    {
-        return FileDialog::new()
-            .pick_file()
-            .map(|path| path.to_string_lossy().to_string())
-            .unwrap_or_default();
-    }
+    FileDialog::new()
+        .pick_file()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_default()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
