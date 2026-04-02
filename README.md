@@ -28,11 +28,13 @@ Yuralock常态/加密时：～30mb / ~30mb
 
 Encrypto：4.61mb
 
-Yuralock：linux为16.8mb, windows为20.2mb
+Yuralock：linux为8.7mb, windows安装包4.0mb,不包括webview仅6.0mb
 
 ## 特性详述
 
 支持零加密至全加密，可以自定义文件加密部分占比
+
+识别码信息使用特殊密钥进行加密，文件任意信息不依赖文件名或后缀
 
 加密比例为0时不加密文件，但是设置伪装层，记录文件头信息（文件头会被加密），写入sha256校验码
 
@@ -45,6 +47,6 @@ Yuralock：linux为16.8mb, windows为20.2mb
 
 ❌ 预计支持AES256, ChaCha20, ML-KEM
 
-❌ 支持查看加密进度，当前加解密时程序会被卡住
+❌ 支持查看加/解密进度，当前加解密时程序会静默直到加/解密完成
 
 ❌ io_uring
