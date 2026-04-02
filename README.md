@@ -58,3 +58,12 @@ Yuralock：linux为8.7mb, windows安装包4.0mb,不包括webview仅6.0mb
 ✅ Android兼容
 
 ❌ MacOs兼容
+
+
+## 代码占比
+
+yuralock库：全古法编程
+
+yuralock_tauri后端：70%古法编程+review
+
+yuralock_tauri前端：30%古法编程+review
