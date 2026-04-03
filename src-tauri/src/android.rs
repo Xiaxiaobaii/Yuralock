@@ -4,12 +4,12 @@ use anyhow::bail;
 use tauri_plugin_android_fs::{AndroidFsExt, FileUri};
 use uuid::Uuid;
 use yuralock::{
-    crypto::{decrypt, encrypt, BlakeRead},
+    crypto::{decrypt, BlakeRead},
     pubapi::{filter_fake_header, peek_source},
-    EncryFile, EncryHeader,
+    EncryHeader,
 };
 
-use crate::{compatible_encrypt, CryptoResult, DEFAULT_ENCRYPT_PART};
+use crate::{compatible_encrypt, CryptoResult};
 
 pub(crate) async fn peek_file_from_uri(app: &tauri::AppHandle, input_path: &str) -> bool {
     let source_uri = FileUri::from_uri(input_path);
@@ -22,11 +22,13 @@ pub(crate) async fn peek_file_from_uri(app: &tauri::AppHandle, input_path: &str)
     }
 }
 
-pub(crate) async fn pick_input_file(app: &tauri::AppHandle) -> Result<String, String> {
-    let source_uri = pick_android_input_and_output_dir(app)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(source_uri.uri)
+pub(crate) async fn pick_input_file(app: &tauri::AppHandle) -> String {
+    let source_uri = pick_android_input_and_output_dir(app).await;
+    if let Ok(uri) = source_uri {
+        uri.uri
+    } else {
+        String::new()
+    }
 }
 
 async fn encrypt_android_uri(
