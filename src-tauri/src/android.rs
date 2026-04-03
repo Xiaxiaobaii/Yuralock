@@ -9,11 +9,17 @@ use yuralock::{
     EncryFile, EncryHeader,
 };
 
-use crate::{CryptoResult, DEFAULT_ENCRYPT_PART};
+use crate::{compatible_encrypt, CryptoResult, DEFAULT_ENCRYPT_PART};
 
 pub(crate) async fn peek_file_from_uri(app: &tauri::AppHandle, input_path: &str) -> bool {
     let source_uri = FileUri::from_uri(input_path);
-    peek_android_uri(app, &source_uri).await
+    let api = app.android_fs_async();
+    let source_file = api.open_file_readable(&source_uri).await;
+    if let Ok(mut file) = source_file {
+        peek_source(&mut file)
+    } else {
+        false
+    }
 }
 
 pub(crate) async fn pick_input_file(app: &tauri::AppHandle) -> Result<String, String> {
@@ -23,35 +29,22 @@ pub(crate) async fn pick_input_file(app: &tauri::AppHandle) -> Result<String, St
     Ok(source_uri.uri)
 }
 
-async fn peek_android_uri(
-    app: &tauri::AppHandle<impl tauri::Runtime>,
-    source_uri: &FileUri,
-) -> bool {
-    let api = app.android_fs_async();
-    let source_file = api.open_file_readable(source_uri).await;
-    if let Ok(mut file) = source_file {
-        peek_source(&mut file)
-    } else {
-        false
-    }
-}
-
 async fn encrypt_android_uri(
     app: &tauri::AppHandle<impl tauri::Runtime>,
     source_uri: &FileUri,
     output_dir_uri: &FileUri,
     key: String,
-    encrypt_part: Option<u64>,
+    encrypt_part: u64,
 ) -> Result<CryptoResult, String> {
     let api = app.android_fs_async();
-    let mut source = api
+    let source = api
         .open_file_readable(source_uri)
         .await
         .map_err(|e| e.to_string())?;
-    let source_size = api.get_len(source_uri).await.map_err(|e| e.to_string())?;
-    let source_name = sanitize_android_file_name(&strip_android_uuid_prefix(
-        &api.get_name_or_last_path_segment(source_uri).await,
-    ));
+
+    //let source_size = api.get_len(source_uri).await.map_err(|e| e.to_string())?;
+    let source_name =
+        sanitize_android_file_name(&api.get_name_or_last_path_segment(source_uri).await);
     let output_name = Uuid::new_v4().to_string();
 
     let target_uri = api
@@ -62,27 +55,9 @@ async fn encrypt_android_uri(
         .open_file_writable(&target_uri)
         .await
         .map_err(|e| e.to_string())?;
-    let mut dest = EncryFile::from_file(target_file, key.clone());
-    let encrypt_part_size = dest
-        .write_header_down(
-            source_name,
-            source_size,
-            encrypt_part.unwrap_or(DEFAULT_ENCRYPT_PART).min(100),
-        )
+
+    compatible_encrypt(source, target_file, source_name, encrypt_part, key)
         .map_err(|e| e.to_string())?;
-
-    encrypt(
-        &mut source
-            .try_clone()
-            .map_err(|e| e.to_string())?
-            .take(encrypt_part_size),
-        &mut dest,
-        &key,
-    )
-    .map_err(|e| e.to_string())?;
-
-    io::copy(&mut source, &mut dest).map_err(|e| e.to_string())?;
-    dest.finilaize().map_err(|e| e.to_string())?;
 
     Ok(CryptoResult {
         output_path: target_uri.uri,
@@ -141,10 +116,8 @@ pub(crate) async fn process_file_from_android_uri(
     input_path: &str,
     isencry: bool,
     key: String,
-    encrypt_part: Option<u64>,
+    encrypt_part: u64,
 ) -> Result<CryptoResult, String> {
-    // Keep the URI exactly as returned by the Android picker.
-    // Decoding it can change SAF URI semantics and invalidate granted access.
     let source_uri = FileUri::from_uri(input_path);
     let output_dir_path = input_path.split('/').collect::<Vec<&str>>();
     let output_dir_path = output_dir_path[0..output_dir_path.len() - 1].join("/");
@@ -177,7 +150,7 @@ fn sanitize_android_file_name(name: &str) -> String {
 
 fn strip_android_uuid_prefix(name: &str) -> String {
     if let Some((prefix, rest)) = name.split_once('_') {
-        if !rest.is_empty() && Uuid::parse_str(prefix).is_ok() {
+        if !rest.is_empty() {
             return rest.to_string();
         }
     }

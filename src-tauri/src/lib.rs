@@ -82,40 +82,51 @@ fn validate_common(input_path: &str, key: &str) -> Result<PathBuf, String> {
     Ok(source_path)
 }
 
-fn normalize_encrypt_part(encrypt_part: Option<u64>) -> u64 {
-    encrypt_part.unwrap_or(DEFAULT_ENCRYPT_PART).min(100)
+fn compatible_encrypt(
+    mut source: File,
+    dest: File,
+    source_name: String,
+    part: u64,
+    key: String,
+) -> Result<(), anyhow::Error> {
+    let mut dest = EncryFile::from_file(dest, key.clone());
+    let source_size = source.metadata()?.len();
+
+    let encrypt_part_size = dest.write_header_down(source_name, source_size, part)?;
+    encrypt(
+        &mut source.by_ref().take(encrypt_part_size),
+        &mut dest,
+        &key,
+    )?;
+    io::copy(&mut source, &mut dest)?;
+    dest.finilaize()?;
+    Ok(())
 }
 
 fn encrypt_file_from_path(
     source_path: PathBuf,
     key: String,
-    encrypt_part: Option<u64>,
+    encrypt_part: u64,
 ) -> Result<CryptoResult, String> {
-    let mut source = File::open(&source_path).map_err(|e| e.to_string())?;
+    let source = File::open(&source_path).map_err(|e| e.to_string())?;
 
     let mut output_path = output_dir_from_input(&source_path)?;
     let file_name = Uuid::new_v4().to_string();
     output_path.push(&file_name);
 
-    let mut dest = EncryFile::new(output_path.clone(), key.clone()).map_err(|e| e.to_string())?;
+    let dest = File::create(&output_path).map_err(|e| e.to_string())?;
 
-    let encrypt_part_size = dest
-        .write_header(&source_path, normalize_encrypt_part(encrypt_part))
-        .map_err(|e| e.to_string())?;
-
-    encrypt(
-        &mut source
-            .try_clone()
-            .map_err(|e| e.to_string())?
-            .take(encrypt_part_size),
-        &mut dest,
-        &key,
+    compatible_encrypt(
+        source,
+        dest,
+        source_path
+            .file_name()
+            .map(|osname| osname.to_string_lossy().to_string())
+            .ok_or(format!("转换源文件路径出错: {:?}", source_path))?,
+        encrypt_part,
+        key,
     )
     .map_err(|e| e.to_string())?;
-
-    io::copy(&mut source, &mut dest).map_err(|e| e.to_string())?;
-
-    dest.finilaize().map_err(|e| e.to_string())?;
 
     Ok(CryptoResult {
         output_path: output_path.to_string_lossy().to_string(),
@@ -173,7 +184,7 @@ async fn process_file_from_path_inner(
     input_path: String,
     isencry: bool,
     key: String,
-    encrypt_part: Option<u64>,
+    encrypt_part: u64,
 ) -> Result<CryptoResult, String> {
     let source_path = validate_common(&input_path, &key)?;
     let start = Instant::now();
@@ -195,6 +206,7 @@ async fn process_file_from_path(
     key: String,
     encrypt_part: Option<u64>,
 ) -> Result<CryptoResult, String> {
+    let encrypt_part = encrypt_part.unwrap_or(DEFAULT_ENCRYPT_PART);
     #[cfg(target_os = "android")]
     return android::process_file_from_android_uri(&_app, &input_path, isencry, key, encrypt_part)
         .await;

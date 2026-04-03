@@ -11,7 +11,7 @@ lerna-debug.log*
 
 
 .codex
-
+.mailmap
 src-tauri/target
 
 node_modules
