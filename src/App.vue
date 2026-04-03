@@ -15,9 +15,10 @@ type ToastPayload = {
 
 const inputPath = ref("");
 const key = ref("");
+const encryptPart = ref(20);
 
 const running = ref(false);
-const isEncryptedFile = ref<boolean>(false);
+const isEncryptedFile = ref<boolean>(true);
 
 const toastVisible = ref(false);
 const toastText = ref("");
@@ -46,6 +47,8 @@ const submitText = computed(() => {
   if (running.value) return "处理中...";
   return `开始${isEncryptedFile.value ? "解密" : "加密"}`;
 });
+
+const encryptPartText = computed(() => `${encryptPart.value}%`);
 
 const canSubmit = computed(
   () =>
@@ -137,6 +140,7 @@ async function run() {
       inputPath: inputPath.value,
       isencry: isEncryptedFile.value,
       key: key.value,
+      encryptPart: isEncryptedFile.value ? null : encryptPart.value,
     });
     result.output_path = decodeURIComponent(result.output_path);
     showToast(`${result.message}\n${result.output_path}`, "success");
@@ -178,6 +182,20 @@ async function run() {
 
               type="text"
               placeholder="输入密钥"
+            />
+          </div>
+
+          <div v-if="!isEncryptedFile" class="part-row">
+            <div class="part-row-head">
+              <span>加密比例</span>
+              <span>{{ encryptPartText }}</span>
+            </div>
+            <input
+              v-model.number="encryptPart"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
             />
           </div>
 

@@ -82,7 +82,15 @@ fn validate_common(input_path: &str, key: &str) -> Result<PathBuf, String> {
     Ok(source_path)
 }
 
-fn encrypt_file_from_path(source_path: PathBuf, key: String) -> Result<CryptoResult, String> {
+fn normalize_encrypt_part(encrypt_part: Option<u64>) -> u64 {
+    encrypt_part.unwrap_or(DEFAULT_ENCRYPT_PART).min(100)
+}
+
+fn encrypt_file_from_path(
+    source_path: PathBuf,
+    key: String,
+    encrypt_part: Option<u64>,
+) -> Result<CryptoResult, String> {
     let mut source = File::open(&source_path).map_err(|e| e.to_string())?;
 
     let mut output_path = output_dir_from_input(&source_path)?;
@@ -92,7 +100,7 @@ fn encrypt_file_from_path(source_path: PathBuf, key: String) -> Result<CryptoRes
     let mut dest = EncryFile::new(output_path.clone(), key.clone()).map_err(|e| e.to_string())?;
 
     let encrypt_part_size = dest
-        .write_header(&source_path, DEFAULT_ENCRYPT_PART)
+        .write_header(&source_path, normalize_encrypt_part(encrypt_part))
         .map_err(|e| e.to_string())?;
 
     encrypt(
@@ -165,13 +173,14 @@ async fn process_file_from_path_inner(
     input_path: String,
     isencry: bool,
     key: String,
+    encrypt_part: Option<u64>,
 ) -> Result<CryptoResult, String> {
     let source_path = validate_common(&input_path, &key)?;
     let start = Instant::now();
     let result = if isencry {
         decrypt_file_from_path(source_path, key)
     } else {
-        encrypt_file_from_path(source_path, key)
+        encrypt_file_from_path(source_path, key, encrypt_part)
     };
     let duration = start.elapsed();
     println!("Processing time: {:?}", duration);
@@ -184,12 +193,14 @@ async fn process_file_from_path(
     input_path: String,
     isencry: bool,
     key: String,
+    encrypt_part: Option<u64>,
 ) -> Result<CryptoResult, String> {
     #[cfg(target_os = "android")]
-    return android::process_file_from_android_uri(&_app, &input_path, isencry, key).await;
+    return android::process_file_from_android_uri(&_app, &input_path, isencry, key, encrypt_part)
+        .await;
 
     #[cfg(not(target_os = "android"))]
-    process_file_from_path_inner(input_path, isencry, key).await
+    process_file_from_path_inner(input_path, isencry, key, encrypt_part).await
 }
 
 #[tauri::command]

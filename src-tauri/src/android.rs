@@ -41,6 +41,7 @@ async fn encrypt_android_uri(
     source_uri: &FileUri,
     output_dir_uri: &FileUri,
     key: String,
+    encrypt_part: Option<u64>,
 ) -> Result<CryptoResult, String> {
     let api = app.android_fs_async();
     let mut source = api
@@ -63,7 +64,11 @@ async fn encrypt_android_uri(
         .map_err(|e| e.to_string())?;
     let mut dest = EncryFile::from_file(target_file, key.clone());
     let encrypt_part_size = dest
-        .write_header_down(source_name, source_size, DEFAULT_ENCRYPT_PART)
+        .write_header_down(
+            source_name,
+            source_size,
+            encrypt_part.unwrap_or(DEFAULT_ENCRYPT_PART).min(100),
+        )
         .map_err(|e| e.to_string())?;
 
     encrypt(
@@ -136,6 +141,7 @@ pub(crate) async fn process_file_from_android_uri(
     input_path: &str,
     isencry: bool,
     key: String,
+    encrypt_part: Option<u64>,
 ) -> Result<CryptoResult, String> {
     // Keep the URI exactly as returned by the Android picker.
     // Decoding it can change SAF URI semantics and invalidate granted access.
@@ -148,7 +154,7 @@ pub(crate) async fn process_file_from_android_uri(
     if isencry {
         decrypt_android_uri(app, &source_uri, &output_dir_uri, key).await
     } else {
-        encrypt_android_uri(app, &source_uri, &output_dir_uri, key).await
+        encrypt_android_uri(app, &source_uri, &output_dir_uri, key, encrypt_part).await
     }
 }
 
