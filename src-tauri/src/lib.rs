@@ -1,19 +1,22 @@
 use std::{
     fs::File,
     io::{self, Read},
-    path::Path,
 };
 
 use serde::Serialize;
 use tauri::Emitter;
 use yuralock::EncryFile;
-use yuralock::{crypto::encrypt, pubapi::peek_file};
+use yuralock::{crypto::encrypt};
 
 #[cfg(target_os = "android")]
 mod android;
 
 #[cfg(not(target_os = "android"))]
 mod desktop;
+#[cfg(not(target_os = "android"))]
+use yuralock::pubapi::peek_file;
+#[cfg(not(target_os = "android"))]
+use std::path::Path;
 
 const DEFAULT_ENCRYPT_PART: u64 = 20;
 
@@ -98,7 +101,7 @@ async fn process_file_from_path(
 #[tauri::command]
 async fn pick_input_file(_app: tauri::AppHandle) -> String {
     #[cfg(target_os = "android")]
-    return android::pick_input_file(&_app);
+    return android::pick_input_file(&_app).await;
 
     #[cfg(not(target_os = "android"))]
     desktop::pick_input_file()

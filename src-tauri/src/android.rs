@@ -150,15 +150,6 @@ fn sanitize_android_file_name(name: &str) -> String {
     }
 }
 
-fn strip_android_uuid_prefix(name: &str) -> String {
-    if let Some((prefix, rest)) = name.split_once('_') {
-        if !rest.is_empty() {
-            return rest.to_string();
-        }
-    }
-    name.to_string()
-}
-
 async fn pick_android_input_and_output_dir(
     app: &tauri::AppHandle<impl tauri::Runtime>,
 ) -> Result<FileUri, anyhow::Error> {
