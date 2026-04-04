@@ -11,14 +11,14 @@ use yuralock::EncryHeader;
 
 use crate::{compatible_encrypt, CryptoResult};
 
-pub fn encrypt_file_from_path(
-    source_path: PathBuf,
+pub fn encrypt_file_from_path<P: AsRef<Path>>(
+    source_path: P,
     key: String,
     encrypt_part: u64,
 ) -> Result<CryptoResult, String> {
     let source = File::open(&source_path).map_err(|e| e.to_string())?;
 
-    let mut output_path = output_dir_from_input(&source_path)?;
+    let mut output_path = output_dir_from_input(source_path.as_ref())?;
     let file_name = Uuid::new_v4().to_string();
     output_path.push(&file_name);
 
@@ -28,9 +28,10 @@ pub fn encrypt_file_from_path(
         source,
         dest,
         source_path
+            .as_ref()
             .file_name()
             .map(|osname| osname.to_string_lossy().to_string())
-            .ok_or(format!("转换源文件路径出错: {:?}", source_path))?,
+            .ok_or(format!("转换源文件路径出错: {:?}", source_path.as_ref()))?,
         encrypt_part,
         key,
     )
@@ -42,7 +43,7 @@ pub fn encrypt_file_from_path(
     })
 }
 
-pub fn decrypt_file_from_path(source_path: PathBuf, key: String) -> Result<CryptoResult, String> {
+pub fn decrypt_file_from_path<P: AsRef<Path>>(source_path: P, key: String) -> Result<CryptoResult, String> {
     let origin_size = fs::metadata(&source_path).map_err(|e| e.to_string())?.len();
     let mut source = BlakeRead::from_read(File::open(&source_path).map_err(|e| e.to_string())?);
 
@@ -50,8 +51,7 @@ pub fn decrypt_file_from_path(source_path: PathBuf, key: String) -> Result<Crypt
 
     let encry_part: EncryHeader = EncryHeader::new(&mut source, &key)
         .map_err(|_| "读取文件头失败，文件损坏或密钥错误".to_string())?;
-
-    let mut output_path = output_dir_from_input(&source_path)?;
+    let mut output_path = output_dir_from_input(source_path.as_ref())?;
     output_path.push(&encry_part.file_name);
 
     let mut limit_source = source.by_ref().take(encry_part.complate_encry_size());
@@ -88,32 +88,15 @@ pub async fn process_file_from_path_inner(
     key: String,
     encrypt_part: u64,
 ) -> Result<CryptoResult, String> {
-    let source_path = validate_common(&input_path, &key)?;
     let start = Instant::now();
     let result = if isencry {
-        decrypt_file_from_path(source_path, key)
+        decrypt_file_from_path(&input_path, key)
     } else {
-        encrypt_file_from_path(source_path, key, encrypt_part)
+        encrypt_file_from_path(&input_path, key, encrypt_part)
     };
     let duration = start.elapsed();
     println!("Processing time: {:?}", duration);
     result
-}
-
-fn validate_common(input_path: &str, key: &str) -> Result<PathBuf, String> {
-    let source_path = normalize_input_path(input_path)?;
-    if key.is_empty() {
-        return Err("请输入密钥".to_string());
-    }
-    Ok(source_path)
-}
-
-fn normalize_input_path(input_path: &str) -> Result<PathBuf, String> {
-    let trimmed = input_path.trim();
-    if trimmed.is_empty() {
-        return Err("请选择文件".to_string());
-    }
-    Ok(PathBuf::from(trimmed))
 }
 
 fn output_dir_from_input(input_path: &Path) -> Result<PathBuf, String> {

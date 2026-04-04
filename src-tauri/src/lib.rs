@@ -13,12 +13,8 @@ mod android;
 
 #[cfg(not(target_os = "android"))]
 mod desktop;
-#[cfg(not(target_os = "android"))]
-use yuralock::pubapi::peek_file;
-#[cfg(not(target_os = "android"))]
-use std::path::Path;
 
-const DEFAULT_ENCRYPT_PART: u64 = 20;
+const DEFAULT_ENCRYPT_PART: u64 = 50;
 
 #[derive(Serialize)]
 struct CryptoResult {
@@ -77,7 +73,7 @@ async fn peek_file_from_path(_app: tauri::AppHandle, input_path: String) -> Resu
     return Ok(android::peek_file_from_uri(&_app, &input_path).await);
 
     #[cfg(not(target_os = "android"))]
-    Ok(peek_file(Path::new(&input_path)).unwrap_or(false))
+    Ok(yuralock::pubapi::peek_file(input_path).unwrap_or(false))
 }
 
 #[tauri::command]

@@ -45,8 +45,7 @@ async fn encrypt_android_uri(
         .map_err(|e| e.to_string())?;
 
     //let source_size = api.get_len(source_uri).await.map_err(|e| e.to_string())?;
-    let source_name =
-        sanitize_android_file_name(&api.get_name_or_last_path_segment(source_uri).await);
+    let source_name = api.get_name_or_last_path_segment(source_uri).await;
     let output_name = Uuid::new_v4().to_string();
 
     let target_uri = api
@@ -84,9 +83,8 @@ async fn decrypt_android_uri(
     filter_fake_header(&mut source).map_err(|_| "伪装层读取失败".to_string())?;
     let encry_part: EncryHeader = EncryHeader::new(&mut source, &key)
         .map_err(|_| "读取文件头失败，文件损坏或密钥错误".to_string())?;
-    let output_name = sanitize_android_file_name(&encry_part.file_name);
     let target_uri = api
-        .create_new_file(output_dir_uri, &output_name, None)
+        .create_new_file(output_dir_uri, &encry_part.file_name, None)
         .await
         .map_err(|e| e.to_string())?;
     let mut dest = api
@@ -130,23 +128,6 @@ pub(crate) async fn process_file_from_android_uri(
         decrypt_android_uri(app, &source_uri, &output_dir_uri, key).await
     } else {
         encrypt_android_uri(app, &source_uri, &output_dir_uri, key, encrypt_part).await
-    }
-}
-
-fn sanitize_android_file_name(name: &str) -> String {
-    let sanitized = name
-        .trim()
-        .chars()
-        .map(|ch| match ch {
-            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
-            _ => ch,
-        })
-        .collect::<String>();
-
-    if sanitized.is_empty() {
-        "picked-file.bin".to_string()
-    } else {
-        sanitized
     }
 }
 
