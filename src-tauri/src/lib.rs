@@ -1,12 +1,12 @@
 use std::{
     fs::File,
-    io::{self, Read},
+    io::{self, Read, Write},
 };
 
 use serde::Serialize;
 use tauri::Emitter;
+use yuralock::crypto::{AEStream, BUFFER_SIZE};
 use yuralock::EncryFile;
-use yuralock::{crypto::encrypt};
 
 #[cfg(target_os = "android")]
 mod android;
@@ -29,6 +29,11 @@ struct ToastPayload {
     toast_type: String,
 }
 
+#[derive(Clone, Serialize)]
+pub(crate) struct CryptoProgressPayload {
+    percent: u8,
+}
+
 #[tauri::command]
 fn show_toast_from_backend(
     app: tauri::AppHandle,
@@ -46,23 +51,87 @@ fn show_toast_from_backend(
     .map_err(|e| e.to_string())
 }
 
+pub(crate) fn emit_frontend_progress<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    percent: u8,
+) -> Result<(), String> {
+    app.emit(
+        "frontend://crypto-progress",
+        CryptoProgressPayload {
+            percent: percent.min(100),
+        },
+    )
+    .map_err(|e| e.to_string())
+}
+
+pub(crate) fn progress_percent(processed: u64, total: u64) -> u8 {
+    if total == 0 {
+        return 100;
+    }
+    ((processed.min(total) * 100) / total) as u8
+}
+
+pub(crate) fn emit_progress_if_changed<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    processed: u64,
+    total: u64,
+    last_percent: &mut u8,
+) {
+    let current = progress_percent(processed, total);
+    if current != *last_percent {
+        *last_percent = current;
+        let _ = emit_frontend_progress(app, current);
+    }
+}
+
+fn copy_with_progress(
+    source: &mut impl Read,
+    dest: &mut impl Write,
+    on_progress: &mut impl FnMut(u64),
+) -> io::Result<u64> {
+    let mut copied = 0u64;
+    let mut buffer = vec![0u8; BUFFER_SIZE];
+
+    loop {
+        let read = source.read(&mut buffer)?;
+        if read == 0 {
+            return Ok(copied);
+        }
+        dest.write_all(&buffer[..read])?;
+        copied += read as u64;
+        on_progress(read as u64);
+    }
+}
+
 fn compatible_encrypt(
     mut source: File,
     dest: File,
     source_name: String,
+    source_size: u64,
     part: u64,
     key: String,
+    mut on_progress: impl FnMut(u64),
 ) -> Result<(), anyhow::Error> {
     let mut dest = EncryFile::from_file(dest, key.clone());
-    let source_size = source.metadata()?.len();
-
     let encrypt_part_size = dest.write_header_down(source_name, source_size, part)?;
-    encrypt(
-        &mut source.by_ref().take(encrypt_part_size),
-        &mut dest,
-        &key,
-    )?;
-    io::copy(&mut source, &mut dest)?;
+
+    {
+        let encrypt_source = Read::by_ref(&mut source).take(encrypt_part_size);
+        let mut stream = AEStream::new(encrypt_source, &mut dest)?;
+        stream.set_encryptor(&key)?;
+        loop {
+            let next = stream.next()?;
+            if next == usize::MAX {
+                on_progress(BUFFER_SIZE as u64);
+                continue;
+            }
+            on_progress(next as u64);
+            stream.finalize(next)?;
+            break;
+        }
+    }
+
+    copy_with_progress(&mut source, &mut dest, &mut on_progress)?;
     dest.finilaize()?;
     Ok(())
 }
@@ -85,13 +154,21 @@ async fn process_file_from_path(
     encrypt_part: Option<u64>,
 ) -> Result<CryptoResult, String> {
     let encrypt_part = encrypt_part.unwrap_or(DEFAULT_ENCRYPT_PART);
+    let _ = emit_frontend_progress(&_app, 0);
 
     #[cfg(target_os = "android")]
-    return android::process_file_from_android_uri(&_app, &input_path, isencry, key, encrypt_part)
-        .await;
+    let result =
+        android::process_file_from_android_uri(&_app, &input_path, isencry, key, encrypt_part)
+            .await;
 
     #[cfg(not(target_os = "android"))]
-    desktop::process_file_from_path_inner(input_path, isencry, key, encrypt_part).await
+    let result =
+        desktop::process_file_from_path_inner(&_app, input_path, isencry, key, encrypt_part).await;
+
+    if result.is_ok() {
+        let _ = emit_frontend_progress(&_app, 100);
+    }
+    result
 }
 
 #[tauri::command]

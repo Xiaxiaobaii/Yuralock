@@ -13,9 +13,14 @@ type ToastPayload = {
   type?: "success" | "error";
 };
 
+type ProgressPayload = {
+  percent: number;
+};
+
 const inputPath = ref("");
 const key = ref("");
 const encryptPart = ref(20);
+const progressPercent = ref(0);
 
 const running = ref(false);
 const isEncryptedFile = ref<boolean>(true);
@@ -28,6 +33,7 @@ const splashExiting = ref(false);
 let splashExitTimer: number | null = null;
 let toastTimer: number | null = null;
 let unlistenToastEvent: UnlistenFn | null = null;
+let unlistenProgressEvent: UnlistenFn | null = null;
 
 const fileName = computed(() => {
   const path = inputPath.value.trim();
@@ -85,6 +91,18 @@ onMounted(() => {
   }).catch((error) => {
     console.error("toast 事件监听失败:", error);
   });
+
+  void listen<ProgressPayload>("frontend://crypto-progress", (event) => {
+    const percent = Number(event.payload?.percent ?? 0);
+    if (!Number.isFinite(percent)) {
+      return;
+    }
+    progressPercent.value = Math.max(0, Math.min(100, Math.trunc(percent)));
+  }).then((unlisten) => {
+    unlistenProgressEvent = unlisten;
+  }).catch((error) => {
+    console.error("进度事件监听失败:", error);
+  });
 });
 
 onBeforeUnmount(() => {
@@ -99,6 +117,10 @@ onBeforeUnmount(() => {
   if (unlistenToastEvent) {
     unlistenToastEvent();
     unlistenToastEvent = null;
+  }
+  if (unlistenProgressEvent) {
+    unlistenProgressEvent();
+    unlistenProgressEvent = null;
   }
 });
 
@@ -133,6 +155,7 @@ async function run() {
     return;
   }
 
+  progressPercent.value = 0;
   running.value = true;
 
   try {
@@ -199,9 +222,23 @@ async function run() {
             />
           </div>
 
-          <button type="submit" class="run-btn" :disabled="!canSubmit">
+          <button v-if="!running" type="submit" class="run-btn" :disabled="!canSubmit">
             {{ submitText }}
           </button>
+          <div v-else class="run-progress">
+            <div class="run-progress-head">
+              <span>{{ isEncryptedFile ? "解密中" : "加密中" }}</span>
+              <span>{{ progressPercent }}%</span>
+            </div>
+            <input
+              class="run-progress-slider"
+              type="range"
+              min="0"
+              max="100"
+              :value="progressPercent"
+              disabled
+            />
+          </div>
         </form>
       </div>
     </main>

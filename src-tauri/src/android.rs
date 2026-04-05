@@ -1,15 +1,18 @@
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 
 use anyhow::bail;
 use tauri_plugin_android_fs::{AndroidFsExt, FileUri};
 use uuid::Uuid;
 use yuralock::{
-    crypto::{decrypt, BlakeRead},
+    crypto::{AEStream, BlakeRead, BUFFER_SIZE, CIPHERT_SIZE},
     pubapi::{filter_fake_header, peek_source},
     EncryHeader,
 };
 
-use crate::{compatible_encrypt, CryptoResult};
+use crate::{compatible_encrypt, emit_progress_if_changed, CryptoResult};
+
+const FAKE_HEADER_BYTES: u64 = 8;
+const CHECK_BYTES: u64 = 31;
 
 pub(crate) async fn peek_file_from_uri(app: &tauri::AppHandle, input_path: &str) -> bool {
     let source_uri = FileUri::from_uri(input_path);
@@ -43,8 +46,7 @@ async fn encrypt_android_uri(
         .open_file_readable(source_uri)
         .await
         .map_err(|e| e.to_string())?;
-
-    //let source_size = api.get_len(source_uri).await.map_err(|e| e.to_string())?;
+    let source_size = api.get_len(source_uri).await.map_err(|e| e.to_string())?;
     let source_name = api.get_name_or_last_path_segment(source_uri).await;
     let output_name = Uuid::new_v4().to_string();
 
@@ -56,14 +58,45 @@ async fn encrypt_android_uri(
         .open_file_writable(&target_uri)
         .await
         .map_err(|e| e.to_string())?;
+    let mut processed = 0u64;
+    let mut last_percent = 0u8;
 
-    compatible_encrypt(source, target_file, source_name, encrypt_part, key)
-        .map_err(|e| e.to_string())?;
+    compatible_encrypt(
+        source,
+        target_file,
+        source_name,
+        source_size,
+        encrypt_part,
+        key,
+        |delta| {
+            processed = processed.saturating_add(delta);
+            emit_progress_if_changed(app, processed, source_size, &mut last_percent);
+        },
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(CryptoResult {
         output_path: target_uri.uri,
         message: "加密成功".to_string(),
     })
+}
+
+fn copy_with_progress(
+    source: &mut impl Read,
+    dest: &mut impl Write,
+    on_progress: &mut impl FnMut(u64),
+) -> io::Result<u64> {
+    let mut copied = 0u64;
+    let mut buffer = vec![0u8; BUFFER_SIZE];
+    loop {
+        let read = source.read(&mut buffer)?;
+        if read == 0 {
+            return Ok(copied);
+        }
+        dest.write_all(&buffer[..read])?;
+        copied += read as u64;
+        on_progress(read as u64);
+    }
 }
 
 async fn decrypt_android_uri(
@@ -79,10 +112,16 @@ async fn decrypt_android_uri(
         .await
         .map_err(|e| e.to_string())?;
     let mut source = BlakeRead::from_read(source_file);
+    let mut processed = 0u64;
+    let mut last_percent = 0u8;
 
     filter_fake_header(&mut source).map_err(|_| "伪装层读取失败".to_string())?;
+    processed += FAKE_HEADER_BYTES + CHECK_BYTES;
+    emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
     let encry_part: EncryHeader = EncryHeader::new(&mut source, &key)
         .map_err(|_| "读取文件头失败，文件损坏或密钥错误".to_string())?;
+    processed += encry_part.complate_header_size();
+    emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
     let target_uri = api
         .create_new_file(output_dir_uri, &encry_part.file_name, None)
         .await
@@ -92,18 +131,45 @@ async fn decrypt_android_uri(
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut limit_source = source.by_ref().take(encry_part.complate_encry_size());
-    decrypt(&mut limit_source, &mut dest, &key)
-        .map_err(|_| "解密失败，文件损坏或密钥错误".to_string())?;
+    {
+        let encrypted_part_size = encry_part.complate_encry_size();
+        let decrypt_source = source.by_ref().take(encrypted_part_size);
+        let mut stream = AEStream::new(decrypt_source, &mut dest).map_err(|e| e.to_string())?;
+        stream
+            .set_decryptor(&key)
+            .map_err(|_| "读取文件头失败，文件损坏或密钥错误".to_string())?;
+
+        loop {
+            let next = stream
+                .next()
+                .map_err(|_| "解密失败，文件损坏或密钥错误".to_string())?;
+            if next == usize::MAX {
+                processed += CIPHERT_SIZE as u64;
+                emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
+                continue;
+            }
+            processed += next as u64;
+            emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
+            stream
+                .finalize(next)
+                .map_err(|_| "解密失败，文件损坏或密钥错误".to_string())?;
+            break;
+        }
+    }
 
     let mut no_encry_source = source
         .by_ref()
         .take(encry_part.complate_origin_size(origin_size));
-    io::copy(&mut no_encry_source, &mut dest).map_err(|_| "原始内容拷贝失败".to_string())?;
+    copy_with_progress(&mut no_encry_source, &mut dest, &mut |delta| {
+        processed += delta;
+        emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
+    })
+    .map_err(|_| "原始内容拷贝失败".to_string())?;
 
     if !source.hashcheck(&key).unwrap_or(false) {
         return Err("文件校验失败，与原始文件不一致".to_string());
     }
+    emit_progress_if_changed(app, origin_size, origin_size, &mut last_percent);
 
     Ok(CryptoResult {
         output_path: target_uri.uri,
