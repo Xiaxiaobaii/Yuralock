@@ -15,6 +15,8 @@ mod android;
 mod desktop;
 
 const DEFAULT_ENCRYPT_PART: u64 = 50;
+pub(crate) const FAKE_HEADER_BYTES: u64 = 8;
+pub(crate) const CHECK_BYTES: u64 = 31;
 
 #[derive(Serialize)]
 struct CryptoResult {
@@ -84,7 +86,7 @@ pub(crate) fn emit_progress_if_changed<R: tauri::Runtime>(
     }
 }
 
-fn copy_with_progress(
+pub(crate) fn copy_with_progress(
     source: &mut impl Read,
     dest: &mut impl Write,
     on_progress: &mut impl FnMut(u64),
@@ -103,7 +105,7 @@ fn copy_with_progress(
     }
 }
 
-fn compatible_encrypt(
+pub(crate) fn compatible_encrypt(
     mut source: File,
     dest: File,
     source_name: String,
@@ -136,6 +138,20 @@ fn compatible_encrypt(
     Ok(())
 }
 
+fn normalize_encrypt_part(encrypt_part: Option<u64>) -> u64 {
+    encrypt_part.unwrap_or(DEFAULT_ENCRYPT_PART).min(100)
+}
+
+fn validate_request(input_path: &str, key: &str) -> Result<(), String> {
+    if input_path.trim().is_empty() {
+        return Err("请选择文件".to_string());
+    }
+    if key.is_empty() {
+        return Err("请输入密钥".to_string());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn peek_file_from_path(_app: tauri::AppHandle, input_path: String) -> Result<bool, String> {
     #[cfg(target_os = "android")]
@@ -153,7 +169,8 @@ async fn process_file_from_path(
     key: String,
     encrypt_part: Option<u64>,
 ) -> Result<CryptoResult, String> {
-    let encrypt_part = encrypt_part.unwrap_or(DEFAULT_ENCRYPT_PART);
+    validate_request(&input_path, &key)?;
+    let encrypt_part = normalize_encrypt_part(encrypt_part);
     let _ = emit_frontend_progress(&_app, 0);
 
     #[cfg(target_os = "android")]

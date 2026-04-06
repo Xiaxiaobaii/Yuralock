@@ -1,18 +1,18 @@
-use std::io::{self, Read, Write};
+use std::io::Read;
 
 use anyhow::bail;
 use tauri_plugin_android_fs::{AndroidFsExt, FileUri};
 use uuid::Uuid;
 use yuralock::{
-    crypto::{AEStream, BlakeRead, BUFFER_SIZE, CIPHERT_SIZE},
+    crypto::{AEStream, BlakeRead, CIPHERT_SIZE},
     pubapi::{filter_fake_header, peek_source},
     EncryHeader,
 };
 
-use crate::{compatible_encrypt, emit_progress_if_changed, CryptoResult};
-
-const FAKE_HEADER_BYTES: u64 = 8;
-const CHECK_BYTES: u64 = 31;
+use crate::{
+    compatible_encrypt, copy_with_progress, emit_progress_if_changed, CryptoResult, CHECK_BYTES,
+    FAKE_HEADER_BYTES,
+};
 
 pub(crate) async fn peek_file_from_uri(app: &tauri::AppHandle, input_path: &str) -> bool {
     let source_uri = FileUri::from_uri(input_path);
@@ -79,24 +79,6 @@ async fn encrypt_android_uri(
         output_path: target_uri.uri,
         message: "加密成功".to_string(),
     })
-}
-
-fn copy_with_progress(
-    source: &mut impl Read,
-    dest: &mut impl Write,
-    on_progress: &mut impl FnMut(u64),
-) -> io::Result<u64> {
-    let mut copied = 0u64;
-    let mut buffer = vec![0u8; BUFFER_SIZE];
-    loop {
-        let read = source.read(&mut buffer)?;
-        if read == 0 {
-            return Ok(copied);
-        }
-        dest.write_all(&buffer[..read])?;
-        copied += read as u64;
-        on_progress(read as u64);
-    }
 }
 
 async fn decrypt_android_uri(

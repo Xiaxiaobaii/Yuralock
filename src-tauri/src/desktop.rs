@@ -1,18 +1,18 @@
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use rfd::FileDialog;
 use uuid::Uuid;
-use yuralock::crypto::{AEStream, BlakeRead, BUFFER_SIZE, CIPHERT_SIZE};
+use yuralock::crypto::{AEStream, BlakeRead, CIPHERT_SIZE};
 use yuralock::pubapi::filter_fake_header;
 use yuralock::EncryHeader;
 
-use crate::{compatible_encrypt, emit_progress_if_changed, CryptoResult};
-
-const FAKE_HEADER_BYTES: u64 = 8;
-const CHECK_BYTES: u64 = 31;
+use crate::{
+    compatible_encrypt, copy_with_progress, emit_progress_if_changed, CryptoResult, CHECK_BYTES,
+    FAKE_HEADER_BYTES,
+};
 
 pub fn encrypt_file_from_path<P: AsRef<Path>>(
     app: &tauri::AppHandle,
@@ -53,24 +53,6 @@ pub fn encrypt_file_from_path<P: AsRef<Path>>(
         output_path: output_path.to_string_lossy().to_string(),
         message: "加密成功".to_string(),
     })
-}
-
-fn copy_with_progress(
-    source: &mut impl Read,
-    dest: &mut impl Write,
-    on_progress: &mut impl FnMut(u64),
-) -> io::Result<u64> {
-    let mut copied = 0u64;
-    let mut buffer = vec![0u8; BUFFER_SIZE];
-    loop {
-        let read = source.read(&mut buffer)?;
-        if read == 0 {
-            return Ok(copied);
-        }
-        dest.write_all(&buffer[..read])?;
-        copied += read as u64;
-        on_progress(read as u64);
-    }
 }
 
 pub fn decrypt_file_from_path<P: AsRef<Path>>(
