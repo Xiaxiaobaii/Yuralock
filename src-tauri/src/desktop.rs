@@ -4,9 +4,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use rfd::FileDialog;
-use uuid::Uuid;
 use yuralock::crypto::{AEStream, BlakeRead, CIPHERT_SIZE};
-use yuralock::pubapi::filter_fake_header;
+use yuralock::pubapi::{filter_fake_header, gen_dest_name};
 use yuralock::EncryHeader;
 
 use crate::{
@@ -24,8 +23,7 @@ pub fn encrypt_file_from_path<P: AsRef<Path>>(
     let source_size = source.metadata().map_err(|e| e.to_string())?.len();
 
     let mut output_path = output_dir_from_input(source_path.as_ref()).map_err(|e| e.to_string())?;
-    let file_name = Uuid::new_v4().to_string();
-    output_path.push(&file_name);
+    output_path.push(&gen_dest_name());
 
     let dest = File::create(&output_path).map_err(|e| e.to_string())?;
     let mut processed = 0u64;

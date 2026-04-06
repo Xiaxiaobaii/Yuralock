@@ -5,7 +5,7 @@ use tauri_plugin_android_fs::{AndroidFsExt, FileUri};
 use uuid::Uuid;
 use yuralock::{
     crypto::{AEStream, BlakeRead, CIPHERT_SIZE},
-    pubapi::{filter_fake_header, peek_source},
+    pubapi::{filter_fake_header, peek_source, gen_dest_name},
     EncryHeader,
 };
 
@@ -48,10 +48,9 @@ async fn encrypt_android_uri(
         .map_err(|e| e.to_string())?;
     let source_size = api.get_len(source_uri).await.map_err(|e| e.to_string())?;
     let source_name = api.get_name_or_last_path_segment(source_uri).await;
-    let output_name = Uuid::new_v4().to_string();
 
     let target_uri = api
-        .create_new_file(output_dir_uri, &output_name, None)
+        .create_new_file(output_dir_uri, &gen_dest_name(), None)
         .await
         .map_err(|e| e.to_string())?;
     let target_file = api
