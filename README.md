@@ -51,7 +51,7 @@ Yuralock：linux为8.7mb, windows安装包4.0mb,不包括webview仅6.0mb
 
 ❌ 预计支持AES256, ChaCha20, ML-KEM
 
-❌ 支持查看加/解密进度，当前加解密时程序会静默直到加/解密完成
+✅ 支持查看加/解密进度，当前加解密时程序会静默直到加/解密完成
 
 ❌ io_uring
 
