@@ -1,7 +1,7 @@
 {
   "$schema": "schema_config.json",
   "productName": "Yuralock",
-  "version": "0.2.2",
+  "version": "0.2.4",
   "identifier": "com.xiaxiaobai.yuralock",
   "build": {
     "beforeDevCommand": "npm run dev",
