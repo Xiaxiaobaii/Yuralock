@@ -7,7 +7,7 @@
 YuraLock is a semi-open-source, highly censorship-resistant fast symmetric encryption tool. It supports cross-platform use on Windows, Android, and Linux. It integrates various advanced encryption features while maintaining extremely low resource usage, and is built with the Tauri framework for a lightweight and efficient experience.
 </div>
 
-<img width="1165" height="803" alt="example1" src="https://github.com/user-attachments/assets/41321899-6779-49b0-9d08-7238ae07ddec" />
+<img width="1165" height="803" alt="example1" src="https://github.com/user-attachments/assets/41321899-6779-49b0-9d08-7238ae07ddec" />  
 
 ## Key Features
 
