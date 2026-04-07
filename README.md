@@ -1,7 +1,7 @@
 <img width="1024" height="400" alt="title" src="https://github.com/user-attachments/assets/599ba073-a81a-45da-b3f4-ef480206cd6f" />
 
 <div align="center">
-<a href="https://github.com/Xiaxiaobaii/Yuralock/blob/master/README_zh.md">简体中文</a>
+<a href="https://github.com/Xiaxiaobaii/Yuralock/blob/main/README_zh.md">简体中文</a>
 
 
 YuraLock is a semi-open-source, highly censorship-resistant fast symmetric encryption tool. It supports cross-platform use on Windows, Android, and Linux. It integrates various advanced encryption features while maintaining extremely low resource usage, and is built with the Tauri framework for a lightweight and efficient experience.
