@@ -1,4 +1,4 @@
-![Yuralock-Logo](https://github.com/Xiaxiaobaii/Yuralock/blob/master/public/title.png)
+<img width="1024" height="400" alt="title" src="https://github.com/user-attachments/assets/599ba073-a81a-45da-b3f4-ef480206cd6f" />
 
 <div align="center">
 <a href="https://github.com/Xiaxiaobaii/Yuralock/blob/master/README.md">English</a>
@@ -6,7 +6,7 @@
 由良锁(Yuralock) 是一款半开源、高度反审查的快速对称加密工具，支持 Windows、Android、Linux 三端跨平台使用。它集成多种先进加密技术，同时保持极低的资源占用，基于 Tauri 框架开发，轻量高效。
 </div>
 
-![Example](https://github.com/Xiaxiaobaii/Yuralock/blob/master/assets/example1.png)
+<img width="1165" height="803" alt="example1" src="https://github.com/user-attachments/assets/41321899-6779-49b0-9d08-7238ae07ddec" />
 
 ## 主要特性
 
