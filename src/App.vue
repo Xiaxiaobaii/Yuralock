@@ -196,7 +196,7 @@ async function run() {
     <main class="app" :class="{ 'is-ready': splashExiting }">
       <div class="panel">
         <h1 class="title">
-          <img class="title-image" src="/title2.png" alt="YuraLock" />
+          <img class="title-image" src="/title.png" alt="YuraLock" />
         </h1>
 
         <form class="form" @submit.prevent="run">
