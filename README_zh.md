@@ -10,7 +10,7 @@
 
 ## 主要特性
 
-1. 约比Encrypto快9倍！
+1. 约比Encrypto快90倍！
 
 2. 支持Windows, Linux, Android三端集成！
 

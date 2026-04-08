@@ -11,7 +11,7 @@ YuraLock is a semi-open-source, highly censorship-resistant fast symmetric encry
 
 ## Key Features
 
-1. Approximately 9x faster than Encrypto.
+1. Approximately 90x faster than Encrypto.
 
 2. Supports cross-platform Windows, Android and Linux.
 
