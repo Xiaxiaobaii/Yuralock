@@ -42,7 +42,7 @@ pub fn encrypt_file_from_path<P: AsRef<Path>>(
         key,
         |delta| {
             processed = processed.saturating_add(delta);
-            emit_progress_if_changed(app, processed, source_size, &mut last_percent);
+            emit_progress_if_changed(app, processed, source_size / 100 * encrypt_part, &mut last_percent);
         },
     )
     .map_err(|e| e.to_string())?;
@@ -65,12 +65,10 @@ pub fn decrypt_file_from_path<P: AsRef<Path>>(
 
     filter_fake_header(&mut source).map_err(|_| "伪装层读取失败".to_string())?;
     processed += FAKE_HEADER_BYTES + CHECK_BYTES;
-    emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
 
     let encry_part: EncryHeader = EncryHeader::new(&mut source, &key)
         .map_err(|_| "读取文件头失败，文件损坏或密钥错误".to_string())?;
     processed += encry_part.complate_header_size();
-    emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
     let mut output_path = output_dir_from_input(source_path.as_ref()).map_err(|e| e.to_string())?;
     output_path.push(&encry_part.file_name);
 
@@ -82,22 +80,22 @@ pub fn decrypt_file_from_path<P: AsRef<Path>>(
         let mut stream = AEStream::new(decrypt_source, &mut dest).map_err(|e| e.to_string())?;
         stream
             .set_decryptor(&key)
-            .map_err(|_| "读取文件头失败，文件损坏或密钥错误".to_string())?;
+            .map_err(|_| "解密失败，文件已损坏".to_string())?;
 
         loop {
             let next = stream
                 .next()
-                .map_err(|_| "解密失败，文件损坏或密钥错误".to_string())?;
+                .map_err(|_| "解密失败，文件已损坏".to_string())?;
             if next == usize::MAX {
                 processed += CIPHERT_SIZE as u64;
-                emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
+                emit_progress_if_changed(app, processed, encrypted_part_size, &mut last_percent);
                 continue;
             }
             processed += next as u64;
-            emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
+            emit_progress_if_changed(app, processed, encrypted_part_size, &mut last_percent);
             stream
                 .finalize(next)
-                .map_err(|_| "解密失败，文件损坏或密钥错误".to_string())?;
+                .map_err(|_| "解密失败，文件已损坏".to_string())?;
             break;
         }
     }
@@ -107,14 +105,12 @@ pub fn decrypt_file_from_path<P: AsRef<Path>>(
         .take(encry_part.complate_origin_size(origin_size));
     copy_with_progress(&mut no_encry_source, &mut dest, &mut |delta| {
         processed += delta;
-        emit_progress_if_changed(app, processed, origin_size, &mut last_percent);
     })
     .map_err(|_| "原始内容拷贝失败".to_string())?;
 
     if !source.hashcheck(&key).unwrap_or(false) {
         return Err("文件校验失败，与原始文件不一致".to_string());
     }
-    emit_progress_if_changed(app, origin_size, origin_size, &mut last_percent);
 
     Ok(CryptoResult {
         output_path: output_path.to_string_lossy().to_string(),
