@@ -56,40 +56,18 @@ fn show_toast_from_backend(
 pub(crate) fn emit_frontend_progress<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     percent: u8,
-) -> Result<(), String> {
+) -> Result<(), anyhow::Error> {
     app.emit(
         "frontend://crypto-progress",
         CryptoProgressPayload {
             percent: percent.min(100),
         },
-    )
-    .map_err(|e| e.to_string())
-}
-
-pub(crate) fn progress_percent(processed: u64, total: u64) -> u8 {
-    if total == 0 {
-        return 100;
-    }
-    ((processed.min(total) * 100) / total) as u8
-}
-
-pub(crate) fn emit_progress_if_changed<R: tauri::Runtime>(
-    app: &tauri::AppHandle<R>,
-    processed: u64,
-    total: u64,
-    last_percent: &mut u8,
-) {
-    let current = progress_percent(processed, total);
-    if current != *last_percent {
-        *last_percent = current;
-        let _ = emit_frontend_progress(app, current);
-    }
+    ).map_err(|x| x.into())
 }
 
 pub(crate) fn copy_with_progress(
     source: &mut impl Read,
     dest: &mut impl Write,
-    on_progress: &mut impl FnMut(u64),
 ) -> io::Result<u64> {
     let mut copied = 0u64;
     let mut buffer = vec![0u8; BUFFER_SIZE];
@@ -101,7 +79,6 @@ pub(crate) fn copy_with_progress(
         }
         dest.write_all(&buffer[..read])?;
         copied += read as u64;
-        on_progress(read as u64);
     }
 }
 
@@ -132,8 +109,8 @@ pub(crate) fn compatible_encrypt(
             break;
         }
     }
-
-    copy_with_progress(&mut source, &mut dest, &mut on_progress)?;
+    
+    copy_with_progress(&mut source, &mut dest)?;
     dest.finilaize()?;
     Ok(())
 }

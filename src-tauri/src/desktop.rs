@@ -9,8 +9,7 @@ use yuralock::pubapi::{filter_fake_header, gen_dest_name};
 use yuralock::EncryHeader;
 
 use crate::{
-    compatible_encrypt, copy_with_progress, emit_progress_if_changed, CryptoResult, CHECK_BYTES,
-    FAKE_HEADER_BYTES,
+    CHECK_BYTES, CryptoResult, FAKE_HEADER_BYTES, compatible_encrypt, copy_with_progress, emit_frontend_progress
 };
 
 pub fn encrypt_file_from_path<P: AsRef<Path>>(
@@ -27,8 +26,7 @@ pub fn encrypt_file_from_path<P: AsRef<Path>>(
 
     let dest = File::create(&output_path)?;
     let mut processed = 0u64;
-    let mut last_percent = 0u8;
-
+    let encrypt_size = (encrypt_part as f64 * 0.01 * source_size as f64) as u64;
     compatible_encrypt(
         source,
         dest,
@@ -42,7 +40,7 @@ pub fn encrypt_file_from_path<P: AsRef<Path>>(
         key,
         |delta| {
             processed = processed.saturating_add(delta);
-            emit_progress_if_changed(app, processed, source_size / 100 * encrypt_part, &mut last_percent);
+            let _ = emit_frontend_progress(app, (processed * 100 / encrypt_size) as u8);
         },
     )?;
 
@@ -60,7 +58,6 @@ pub fn decrypt_file_from_path<P: AsRef<Path>>(
     let origin_size = fs::metadata(&source_path)?.len();
     let mut source = BlakeRead::from_read(File::open(&source_path)?);
     let mut processed = 0u64;
-    let mut last_percent = 0u8;
 
     filter_fake_header(&mut source)?;
     processed += FAKE_HEADER_BYTES + CHECK_BYTES;
@@ -80,15 +77,13 @@ pub fn decrypt_file_from_path<P: AsRef<Path>>(
             .set_decryptor(&key)?;
 
         loop {
+            emit_frontend_progress(app, (processed * 100 / encrypted_part_size) as u8)?;
             let next = stream
                 .next()?;
             if next == usize::MAX {
                 processed += CIPHERT_SIZE as u64;
-                emit_progress_if_changed(app, processed, encrypted_part_size, &mut last_percent);
                 continue;
             }
-            processed += next as u64;
-            emit_progress_if_changed(app, processed, encrypted_part_size, &mut last_percent);
             stream
                 .finalize(next)?;
             break;
@@ -98,9 +93,7 @@ pub fn decrypt_file_from_path<P: AsRef<Path>>(
     let mut no_encry_source = source
         .by_ref()
         .take(encry_part.complate_origin_size(origin_size));
-    copy_with_progress(&mut no_encry_source, &mut dest, &mut |delta| {
-        processed += delta;
-    })?;
+    copy_with_progress(&mut no_encry_source, &mut dest)?;
 
     if !source.hashcheck(&key).unwrap_or(false) {
         bail!("与原始文件校验不一致")
