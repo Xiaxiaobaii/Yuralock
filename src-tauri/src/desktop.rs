@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-
+use anyhow::{anyhow, bail};
 use rfd::FileDialog;
 use yuralock::crypto::{AEStream, BlakeRead, CIPHERT_SIZE};
 use yuralock::pubapi::{filter_fake_header, gen_dest_name};
@@ -18,14 +18,14 @@ pub fn encrypt_file_from_path<P: AsRef<Path>>(
     source_path: P,
     key: String,
     encrypt_part: u64,
-) -> Result<CryptoResult, String> {
-    let source = File::open(&source_path).map_err(|e| e.to_string())?;
-    let source_size = source.metadata().map_err(|e| e.to_string())?.len();
+) -> Result<CryptoResult, anyhow::Error> {
+    let source = File::open(&source_path)?;
+    let source_size = source.metadata()?.len();
 
-    let mut output_path = output_dir_from_input(source_path.as_ref()).map_err(|e| e.to_string())?;
+    let mut output_path = output_dir_from_input(source_path.as_ref())?;
     output_path.push(&gen_dest_name());
 
-    let dest = File::create(&output_path).map_err(|e| e.to_string())?;
+    let dest = File::create(&output_path)?;
     let mut processed = 0u64;
     let mut last_percent = 0u8;
 
@@ -36,7 +36,7 @@ pub fn encrypt_file_from_path<P: AsRef<Path>>(
             .as_ref()
             .file_name()
             .map(|osname| osname.to_string_lossy().to_string())
-            .ok_or(format!("转换源文件路径出错: {:?}", source_path.as_ref()))?,
+            .ok_or(anyhow!("转换源文件路径出错: {:?}", source_path.as_ref()))?,
         source_size,
         encrypt_part,
         key,
@@ -44,8 +44,7 @@ pub fn encrypt_file_from_path<P: AsRef<Path>>(
             processed = processed.saturating_add(delta);
             emit_progress_if_changed(app, processed, source_size / 100 * encrypt_part, &mut last_percent);
         },
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     Ok(CryptoResult {
         output_path: output_path.to_string_lossy().to_string(),
@@ -57,35 +56,32 @@ pub fn decrypt_file_from_path<P: AsRef<Path>>(
     app: &tauri::AppHandle,
     source_path: P,
     key: String,
-) -> Result<CryptoResult, String> {
-    let origin_size = fs::metadata(&source_path).map_err(|e| e.to_string())?.len();
-    let mut source = BlakeRead::from_read(File::open(&source_path).map_err(|e| e.to_string())?);
+) -> Result<CryptoResult, anyhow::Error> {
+    let origin_size = fs::metadata(&source_path)?.len();
+    let mut source = BlakeRead::from_read(File::open(&source_path)?);
     let mut processed = 0u64;
     let mut last_percent = 0u8;
 
-    filter_fake_header(&mut source).map_err(|_| "伪装层读取失败".to_string())?;
+    filter_fake_header(&mut source)?;
     processed += FAKE_HEADER_BYTES + CHECK_BYTES;
 
-    let encry_part: EncryHeader = EncryHeader::new(&mut source, &key)
-        .map_err(|_| "读取文件头失败，文件损坏或密钥错误".to_string())?;
+    let encry_part: EncryHeader = EncryHeader::new(&mut source, &key)?;
     processed += encry_part.complate_header_size();
-    let mut output_path = output_dir_from_input(source_path.as_ref()).map_err(|e| e.to_string())?;
+    let mut output_path = output_dir_from_input(source_path.as_ref())?;
     output_path.push(&encry_part.file_name);
 
-    let mut dest = File::create(&output_path).map_err(|e| e.to_string())?;
+    let mut dest = File::create(&output_path)?;
 
     {
         let encrypted_part_size = encry_part.complate_encry_size();
         let decrypt_source = source.by_ref().take(encrypted_part_size);
-        let mut stream = AEStream::new(decrypt_source, &mut dest).map_err(|e| e.to_string())?;
+        let mut stream = AEStream::new(decrypt_source, &mut dest)?;
         stream
-            .set_decryptor(&key)
-            .map_err(|_| "解密失败，文件已损坏".to_string())?;
+            .set_decryptor(&key)?;
 
         loop {
             let next = stream
-                .next()
-                .map_err(|_| "解密失败，文件已损坏".to_string())?;
+                .next()?;
             if next == usize::MAX {
                 processed += CIPHERT_SIZE as u64;
                 emit_progress_if_changed(app, processed, encrypted_part_size, &mut last_percent);
@@ -94,8 +90,7 @@ pub fn decrypt_file_from_path<P: AsRef<Path>>(
             processed += next as u64;
             emit_progress_if_changed(app, processed, encrypted_part_size, &mut last_percent);
             stream
-                .finalize(next)
-                .map_err(|_| "解密失败，文件已损坏".to_string())?;
+                .finalize(next)?;
             break;
         }
     }
@@ -105,11 +100,10 @@ pub fn decrypt_file_from_path<P: AsRef<Path>>(
         .take(encry_part.complate_origin_size(origin_size));
     copy_with_progress(&mut no_encry_source, &mut dest, &mut |delta| {
         processed += delta;
-    })
-    .map_err(|_| "原始内容拷贝失败".to_string())?;
+    })?;
 
     if !source.hashcheck(&key).unwrap_or(false) {
-        return Err("文件校验失败，与原始文件不一致".to_string());
+        bail!("与原始文件校验不一致")
     }
 
     Ok(CryptoResult {
@@ -135,8 +129,10 @@ pub async fn process_file_from_path_inner(
     let start = Instant::now();
     let result = if isencry {
         decrypt_file_from_path(app, &input_path, key)
+        .map_err(|e| e.to_string())
     } else {
         encrypt_file_from_path(app, &input_path, key, encrypt_part)
+        .map_err(|e| e.to_string())
     };
     let duration = start.elapsed();
     println!("Processing time: {:?}", duration);
