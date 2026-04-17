@@ -5,7 +5,7 @@ use std::{
 
 use serde::Serialize;
 use tauri::Emitter;
-use yuralock::crypto::{AEStream, BUFFER_SIZE};
+use yuralock::crypto::{AEStream, BUFFER_SIZE, CHECK_KEY};
 use yuralock::EncryFile;
 
 #[cfg(target_os = "android")]
@@ -143,9 +143,12 @@ async fn process_file_from_path(
     _app: tauri::AppHandle,
     input_path: String,
     isencry: bool,
-    key: String,
+    mut key: String,
     encrypt_part: Option<u64>,
 ) -> Result<CryptoResult, String> {
+    if key == "" {
+        key = CHECK_KEY.to_string();
+    }
     validate_request(&input_path, &key)?;
     let encrypt_part = normalize_encrypt_part(encrypt_part);
     let _ = emit_frontend_progress(&_app, 0);

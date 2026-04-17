@@ -83,8 +83,7 @@ const encryptPartText = computed(() => `${encryptPart.value}%`);
 const canSubmit = computed(
   () =>
     !running.value &&
-    inputPath.value.trim().length > 0 &&
-    key.value.length > 0,
+    inputPath.value.trim().length > 0
 );
 
 onMounted(() => {
@@ -163,9 +162,6 @@ async function selectInputPath() {
 }
 
 async function run() {
-  if (!canSubmit.value) {
-    return;
-  }
 
   progressPercent.value = 0;
   running.value = true;

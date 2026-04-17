@@ -119,6 +119,7 @@ pub async fn process_file_from_path_inner(
     key: String,
     encrypt_part: u64,
 ) -> Result<CryptoResult, String> {
+
     let start = Instant::now();
     let result = if isencry {
         decrypt_file_from_path(app, &input_path, key)
