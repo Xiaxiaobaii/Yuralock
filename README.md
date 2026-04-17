@@ -21,13 +21,15 @@ YuraLock is a semi-open-source, highly censorship-resistant fast symmetric encry
 
 5. Built-in file integrity verification
 
+6. Support Non-Key Encrypt
+
 ## Quick Start
 
 1. Go Release pages to download latest file.
 
 2. Open the App, tap "Select File", and choose the file you want to encrypt.
 
-3. In the "Enter Key" input box, enter the key you want to use.
+3. In the "Enter Key" input box, enter the key you want to use. ( Or Skip
 
 4. Slide the "Encryption Ratio" slider to set the encryption ratio for the file. For text files, important files, or streaming files, it is recommended to use 100% encryption. This will not cause significant time consumption.
 
