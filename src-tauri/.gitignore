@@ -7,3 +7,5 @@
 /gen/schemas
 
 /gen/android/keystore.properties
+
+/gen/
